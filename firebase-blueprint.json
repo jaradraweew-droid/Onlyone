@@ -1,0 +1,8 @@
+{
+  "features": {
+    "firestore": {
+      "rules": "firestore.rules",
+      "indexes": []
+    }
+  }
+}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body>
+<script>
+function generateIcon(size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Background - soft mint/sage
+  const bgGrad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size * 0.7);
+  bgGrad.addColorStop(0, '#F5FFFA');
+  bgGrad.addColorStop(1, '#E8F5E9');
+  ctx.fillStyle = bgGrad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, size, size * 0.2);
+  ctx.fill();
+
+  // Leaf
+  const cx = size / 2;
+  const cy = size / 2;
+  const s = size * 0.35;
+  
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 6);
+  
+  // Leaf shape
+  const leafGrad = ctx.createLinearGradient(-s, 0, s, 0);
+  leafGrad.addColorStop(0, '#66BB6A');
+  leafGrad.addColorStop(0.5, '#81C784');
+  leafGrad.addColorStop(1, '#A5D6A7');
+  ctx.fillStyle = leafGrad;
+  
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.bezierCurveTo(s * 0.8, -s * 0.8, s, -s * 0.2, s * 0.1, s * 0.6);
+  ctx.bezierCurveTo(0, s * 0.7, 0, s * 0.7, 0, s * 0.7);
+  ctx.bezierCurveTo(0, s * 0.7, 0, s * 0.7, -s * 0.1, s * 0.6);
+  ctx.bezierCurveTo(-s, -s * 0.2, -s * 0.8, -s * 0.8, 0, -s);
+  ctx.fill();
+  
+  // Leaf vein
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = size * 0.015;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.8);
+  ctx.lineTo(0, s * 0.6);
+  ctx.stroke();
+  
+  ctx.restore();
+
+  return canvas.toDataURL('image/png');
+}
+
+// Generate and download
+[192, 512].forEach(size => {
+  const dataUrl = generateIcon(size);
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = `icon-${size}.png`;
+  a.click();
+});
+
+document.body.innerHTML = '<h1>Icons generated! Check downloads.</h1>';
+</script>
+</body>
+</html>
