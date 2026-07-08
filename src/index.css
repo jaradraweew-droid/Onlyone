@@ -1,0 +1,422 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  
+  --color-mint: #F5FFFA;
+  --color-mint-dark: #EBF5F0;
+  --color-sage-50: #F4F3ED;
+  --color-sage-100: #E8E6D9;
+  --color-sage-200: #E0DEC9;
+  --color-sage-300: #D8D5C4;
+  --color-sage-400: #C5C1AD;
+  --color-sage-500: #B2AC88;
+  --color-sage-600: #9A9472;
+  --color-sage-700: #8A8565;
+  --color-sage-900: #5C5843;
+  
+  --color-mood-great: #4A5D4E;
+  --color-mood-good: #7A8B7D;
+  --color-mood-okay: #A0B0A3;
+  --color-mood-tired: #C3D5C5;
+}
+
+/* ─── Base ──────────────────────────────────────────────────────── */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+  background-color: var(--color-mint);
+  color: #333;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* ─── Scrollbar Utilities ───────────────────────────────────────── */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Subtle custom scrollbar for desktop */
+@media (min-width: 1024px) {
+  .desktop-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .desktop-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .desktop-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--color-sage-300);
+    border-radius: 999px;
+  }
+  .desktop-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-sage-400);
+  }
+}
+
+/* ─── Safe Area ─────────────────────────────────────────────────── */
+
+.safe-top    { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left   { padding-left: env(safe-area-inset-left, 0px); }
+.safe-right  { padding-right: env(safe-area-inset-right, 0px); }
+
+/* ─── Responsive Container ──────────────────────────────────────── */
+
+.app-container {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* On large screens, center content with max width */
+@media (min-width: 1280px) {
+  .content-max {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ─── Transitions ───────────────────────────────────────────────── */
+
+.transition-spring {
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── Focus Visible ─────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--color-sage-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────── */
+
+body.sidebar-open {
+  overflow: hidden;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 40;
+}
+
+.sidebar-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 65vw;
+  max-width: 220px;
+  background-color: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08), 1px 0 0 var(--color-sage-100);
+  overflow-y: auto;
+}
+
+@media (min-width: 640px) {
+  .sidebar-panel {
+    width: 240px;
+    max-width: 240px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sidebar-panel {
+    width: 260px;
+    max-width: 260px;
+  }
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 12px 12px;
+}
+
+@media (min-width: 640px) {
+  .sidebar-header {
+    padding: 18px 14px 14px;
+  }
+}
+
+.sidebar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background-color: var(--color-sage-50);
+  border: 1.5px solid var(--color-sage-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+@media (min-width: 640px) {
+  .sidebar-avatar {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.sidebar-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-sage-400);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-close-btn:hover {
+  background-color: var(--color-sage-50);
+  color: var(--color-sage-700);
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .sidebar-nav-item {
+    padding: 10px 12px;
+    gap: 12px;
+    border-radius: 12px;
+  }
+}
+
+.sidebar-nav-active {
+  background-color: var(--color-sage-500);
+  color: white;
+  box-shadow: 0 2px 8px rgba(178, 172, 136, 0.35);
+}
+
+.sidebar-nav-inactive {
+  color: var(--color-sage-500);
+}
+
+.sidebar-nav-inactive:hover {
+  background-color: var(--color-sage-50);
+  color: var(--color-sage-700);
+}
+
+.sidebar-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.sidebar-active-dot {
+  position: absolute;
+  right: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background-color: white;
+  opacity: 0.7;
+}
+
+.sidebar-leaf-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.sidebar-leaf-btn:hover {
+  background-color: var(--color-sage-50);
+}
+
+/* ─── Hamburger Button ──────────────────────────────────────────── */
+
+.hamburger-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-sage-600);
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-sage-100);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+@media (min-width: 768px) {
+  .hamburger-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.hamburger-btn:hover {
+  background-color: white;
+  color: var(--color-sage-900);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* ─── Pet Status Bars ───────────────────────────────────────────── */
+
+.pet-stat-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .pet-stat-bar-track {
+    height: 10px;
+  }
+}
+
+.pet-stat-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── Pet Live Activity Banner ──────────────────────────────────── */
+
+.pet-live-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(244, 243, 237, 0.95), rgba(232, 230, 217, 0.9));
+  border: 1px solid var(--color-sage-200);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin: 8px 12px;
+  position: relative;
+}
+
+@media (min-width: 640px) {
+  .pet-live-banner {
+    gap: 10px;
+    padding: 10px 16px;
+    margin: 10px 16px;
+    border-radius: 20px;
+  }
+}
+
+.pet-live-banner-btn {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .pet-live-banner-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+  }
+}
+
+.pet-live-banner-btn:active {
+  transform: scale(0.95);
+}
+
+/* ─── Pet Setup Modal ───────────────────────────────────────────── */
+
+.pet-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: 20px;
+  border: 2px solid var(--color-sage-100);
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.pet-type-card:hover {
+  border-color: var(--color-sage-300);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.pet-type-card-selected {
+  border-color: var(--color-sage-500);
+  background-color: var(--color-sage-50);
+  box-shadow: 0 0 0 3px rgba(178, 172, 136, 0.2);
+}
+
+.pet-type-card img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+@media (min-width: 640px) {
+  .pet-type-card img {
+    width: 100px;
+    height: 100px;
+  }
+}

@@ -1,0 +1,394 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   VirtualKeyboard v2 — Cute Couple Theme 💕
+   Soft pastels, bubbly keys, romantic accents
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Container ─────────────────────────────────────────────────────── */
+
+.vk-container {
+  width: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 248, 245, 0.97) 0%,
+    rgba(252, 240, 236, 0.98) 100%
+  );
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1.5px solid rgba(255, 210, 200, 0.35);
+  padding: 6px 3px env(safe-area-inset-bottom, 6px) 3px;
+  box-shadow:
+    0 -6px 30px rgba(255, 182, 193, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* ─── Keyboard Row ──────────────────────────────────────────────────── */
+
+.vk-row {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+.vk-row:last-child {
+  margin-bottom: 0;
+}
+
+/* ─── Key Base ──────────────────────────────────────────────────────── */
+
+.vk-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 0.1s ease,
+              box-shadow 0.1s ease;
+
+  /* Mobile-first sizing — min-width:0 lets flex shrink for 12-key Thai rows */
+  min-width: 0;
+  height: 42px;
+  padding: 0 1px;
+  font-size: 15px;
+  font-weight: 500;
+  flex-shrink: 1;
+
+  /* Soft, pillowy key style */
+  background: linear-gradient(180deg, #ffffff 0%, #fff8f6 100%);
+  color: #4a3f3a;
+  box-shadow:
+    0 1px 0 1px rgba(220, 180, 170, 0.25),
+    0 2px 4px rgba(180, 140, 130, 0.08);
+}
+
+.vk-key:active {
+  transform: scale(0.88);
+  background: linear-gradient(180deg, #ffe8e4 0%, #ffd6d0 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 180, 170, 0.2),
+    inset 0 1px 3px rgba(200, 140, 130, 0.1);
+}
+
+/* ─── Character Keys ────────────────────────────────────────────────── */
+
+.vk-key--char {
+  flex: 1;
+  max-width: 36px;
+}
+
+/* Combining character display (dotted circle + mark) */
+.vk-key--combining {
+  font-size: 17px;
+  letter-spacing: -1px;
+}
+
+/* ─── Space Bar ─────────────────────────────────────────────────────── */
+
+.vk-key--space {
+  flex: 4;
+  max-width: 240px;
+  border-radius: 20px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: #c4a098;
+  background: linear-gradient(180deg, #ffffff 0%, #fff5f3 100%);
+  box-shadow:
+    0 1px 0 1px rgba(220, 180, 170, 0.2),
+    0 2px 6px rgba(180, 140, 130, 0.06);
+}
+
+/* ─── Action Keys (Shift, Backspace) ────────────────────────────────── */
+
+.vk-key--action {
+  flex: 1.2;
+  max-width: 42px;
+  background: linear-gradient(180deg, #fce4e0 0%, #f5d3ce 100%);
+  color: #9a736a;
+  font-size: 13px;
+  box-shadow:
+    0 1px 0 1px rgba(220, 170, 160, 0.25),
+    0 2px 4px rgba(180, 140, 130, 0.08);
+}
+
+.vk-key--action:active {
+  background: linear-gradient(180deg, #f5d3ce 0%, #eac0b8 100%);
+}
+
+/* ─── Enter Key (Heart / Send) ──────────────────────────────────────── */
+
+.vk-key--enter {
+  flex: 1.4;
+  max-width: 56px;
+  background: linear-gradient(135deg, #ffb4a2 0%, #e5989b 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow:
+    0 1px 0 1px rgba(229, 152, 155, 0.4),
+    0 3px 8px rgba(229, 152, 155, 0.2);
+}
+
+.vk-key--enter:active {
+  background: linear-gradient(135deg, #e5989b 0%, #d08080 100%);
+  transform: scale(0.88);
+}
+
+/* ─── Utility Keys (123, Globe) ─────────────────────────────────────── */
+
+.vk-key--util {
+  flex: 1;
+  max-width: 42px;
+  background: linear-gradient(180deg, #fce4e0 0%, #f5d3ce 100%);
+  color: #9a736a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vk-key--util:active {
+  background: linear-gradient(180deg, #f5d3ce 0%, #eac0b8 100%);
+}
+
+/* ─── Mode Toggle (#+= / 123 in row 3) ──────────────────────────────── */
+
+.vk-key--mode-toggle {
+  flex: 1.2;
+  max-width: 42px;
+  background: linear-gradient(180deg, #fce4e0 0%, #f5d3ce 100%);
+  color: #9a736a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vk-key--mode-toggle:active {
+  background: linear-gradient(180deg, #f5d3ce 0%, #eac0b8 100%);
+}
+
+/* ─── Active Shift ──────────────────────────────────────────────────── */
+
+.vk-container .vk-key.vk-key--shift-active {
+  background: linear-gradient(135deg, #ffcdb2 0%, #ffb4a2 100%);
+  color: white;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 180, 162, 0.5),
+    0 2px 8px rgba(255, 180, 162, 0.25);
+}
+
+/* ─── Active Caps Lock ──────────────────────────────────────────────── */
+
+.vk-container .vk-key.vk-key--caps-active {
+  background: linear-gradient(135deg, #e5989b 0%, #d08080 100%);
+  color: white;
+  box-shadow:
+    0 0 0 2px rgba(229, 152, 155, 0.5),
+    0 2px 10px rgba(229, 152, 155, 0.35);
+}
+
+/* ─── Language Indicator ────────────────────────────────────────────── */
+
+.vk-lang-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 0 3px;
+}
+
+.vk-lang-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #c4a098;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: rgba(255, 200, 190, 0.15);
+  transition: all 0.2s ease;
+}
+
+.vk-lang-badge--active {
+  color: white;
+  background: linear-gradient(135deg, #ffb4a2 0%, #e5989b 100%);
+  box-shadow: 0 1px 4px rgba(229, 152, 155, 0.25);
+}
+
+/* ─── Toggle Button (for desktop in ChatScreen) ─────────────────────── */
+
+.vk-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 200, 190, 0.4);
+  background: white;
+  color: #c4a098;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.vk-toggle-btn:hover {
+  background: #fff5f3;
+  border-color: #ffb4a2;
+  color: #9a736a;
+}
+
+.vk-toggle-btn--active {
+  background: linear-gradient(135deg, #ffb4a2 0%, #e5989b 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.vk-toggle-btn--active:hover {
+  background: linear-gradient(135deg, #e5989b 0%, #d08080 100%);
+  border-color: transparent;
+  color: white;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Responsive Breakpoints
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Tablet (≥ 640px) ──────────────────────────────────────────────── */
+
+@media (min-width: 640px) {
+  .vk-container {
+    padding: 8px 10px env(safe-area-inset-bottom, 8px) 10px;
+  }
+
+  .vk-row {
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+
+  .vk-key {
+    min-width: 34px;
+    height: 46px;
+    font-size: 17px;
+    border-radius: 12px;
+  }
+
+  .vk-key--char {
+    max-width: 46px;
+  }
+
+  .vk-key--space {
+    max-width: 300px;
+  }
+
+  .vk-key--action {
+    max-width: 58px;
+  }
+
+  .vk-key--enter {
+    max-width: 66px;
+  }
+
+  .vk-key--util {
+    max-width: 52px;
+    font-size: 13px;
+  }
+
+  .vk-key--mode-toggle {
+    max-width: 54px;
+    font-size: 12px;
+  }
+}
+
+/* ─── Desktop (≥ 1024px) ────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .vk-container {
+    max-width: 680px;
+    margin: 0 auto;
+    border-radius: 20px 20px 0 0;
+    padding: 10px 14px 12px 14px;
+    box-shadow:
+      0 -6px 30px rgba(255, 182, 193, 0.12),
+      0 0 0 1px rgba(255, 210, 200, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  .vk-row {
+    gap: 5px;
+    margin-bottom: 6px;
+  }
+
+  .vk-key {
+    min-width: 40px;
+    height: 48px;
+    font-size: 16px;
+    border-radius: 12px;
+  }
+
+  .vk-key:hover {
+    background: linear-gradient(180deg, #fff5f3 0%, #ffedea 100%);
+  }
+
+  .vk-key:active {
+    transform: scale(0.93);
+  }
+
+  .vk-key--char {
+    max-width: 50px;
+  }
+
+  .vk-key--space {
+    max-width: 340px;
+    font-size: 13px;
+  }
+
+  .vk-key--action {
+    max-width: 62px;
+    font-size: 14px;
+  }
+
+  .vk-key--enter {
+    max-width: 74px;
+    font-size: 15px;
+  }
+
+  .vk-key--util {
+    max-width: 56px;
+    font-size: 14px;
+  }
+
+  .vk-key--mode-toggle {
+    max-width: 58px;
+    font-size: 13px;
+  }
+}
+
+/* ─── Large Desktop (≥ 1440px) ──────────────────────────────────────── */
+
+@media (min-width: 1440px) {
+  .vk-container {
+    max-width: 760px;
+  }
+
+  .vk-key {
+    min-width: 46px;
+    height: 50px;
+    font-size: 17px;
+  }
+}
+
+/* ─── Reduced Motion ────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .vk-key {
+    transition: none !important;
+  }
+  .vk-key:active {
+    transform: none !important;
+  }
+}
