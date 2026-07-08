@@ -132,7 +132,7 @@ function isTimeBetween(current: string, start: string, end: string): boolean {
 async function startServer() {
   const app = express();
   app.use(express.json());
-  const PORT = 3000;
+  const PORT = process.env.PORT || 8080;
   const httpServer = createServer(app);
   
   app.get("/api/vapidPublicKey", (req, res) => {
