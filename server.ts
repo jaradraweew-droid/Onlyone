@@ -243,12 +243,23 @@ async function startServer() {
     }
   };
 
+  // Derive allowed origins from APP_URL env var or allow all in Cloud Run
+  const allowedOrigins = process.env.APP_URL
+    ? [process.env.APP_URL, 'http://localhost:5173', 'http://localhost:8080']
+    : true; // true = allow all origins
+
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.APP_URL || 'http://localhost:5173',
-      methods: ["GET", "POST"]
+      origin: allowedOrigins,
+      methods: ["GET", "POST"],
+      credentials: true,
     },
-    maxHttpBufferSize: 1e7
+    maxHttpBufferSize: 1e7,
+    // Cloud Run has a 60-second request timeout; keep pings well within that
+    pingTimeout: 30000,
+    pingInterval: 20000,
+    // Allow both polling and websocket so Cloud Run HTTP/2 load balancer works
+    transports: ['polling', 'websocket'],
   });
 
   // Basic in-memory store
@@ -298,11 +309,22 @@ async function startServer() {
     });
 
     socket.on('bond_request', (data: BondData) => {
+        // Check if target room has anyone connected
+        const targetRoom = io.sockets.adapter.rooms.get(data.targetCode);
+        if (!targetRoom || targetRoom.size === 0) {
+          // Target user is offline — still emit request to the room (they may connect later)
+          // but also notify requester that the partner isn't currently online
+          socket.emit('bond_partner_offline', { targetCode: data.targetCode });
+        }
         socket.to(data.targetCode).emit('bond_requested', data.user);
+        // Confirm back to requester that request was sent
+        socket.emit('bond_request_sent', { targetCode: data.targetCode });
     });
     
     socket.on('bond_accept', (data: BondData) => {
         socket.to(data.targetCode).emit('bond_accepted', data.user);
+        // Also notify acceptor with requester's info for state update
+        socket.emit('bond_accepted', data.user);
     });
 
     socket.on('update_message', async (data: UpdateMessageData) => {

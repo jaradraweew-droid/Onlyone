@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { User } from '../types';
 import { motion } from 'motion/react';
-import { Leaf, Copy, Check } from 'lucide-react';
+import { Leaf, Copy, Check, Clock, WifiOff } from 'lucide-react';
 import { socket } from '../socket';
 
 interface Props {
@@ -13,6 +13,7 @@ export default function BondScreen({ user, onUpdateUser }: Props) {
   const [partnerCode, setPartnerCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'sent' | 'partner_offline' | 'error'>('idle');
   const [incomingRequest, setIncomingRequest] = useState<{ seedCode: string; name?: string } | null>(null);
 
   useEffect(() => {
@@ -24,36 +25,94 @@ export default function BondScreen({ user, onUpdateUser }: Props) {
       onUpdateUser({ ...user, partnerId: acceptorUser.seedCode });
     };
 
+    // Feedback to requester: request was delivered
+    const onBondRequestSent = () => {
+      setLoading(false);
+      setStatus('sent');
+    };
+
+    // Feedback to requester: partner is not currently online
+    const onBondPartnerOffline = () => {
+      setLoading(false);
+      setStatus('partner_offline');
+    };
+
     socket.on('bond_requested', onBondRequested);
     socket.on('bond_accepted', onBondAccepted);
+    socket.on('bond_request_sent', onBondRequestSent);
+    socket.on('bond_partner_offline', onBondPartnerOffline);
 
     return () => {
       socket.off('bond_requested', onBondRequested);
       socket.off('bond_accepted', onBondAccepted);
+      socket.off('bond_request_sent', onBondRequestSent);
+      socket.off('bond_partner_offline', onBondPartnerOffline);
     };
   }, [user, onUpdateUser]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(user.seedCode).catch(() => {
-      // Fallback: clipboard API not available
-    });
+    navigator.clipboard.writeText(user.seedCode).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleBond = () => {
-    if (!partnerCode.trim()) return;
+    if (!partnerCode.trim() || loading) return;
     setLoading(true);
-    socket.emit('bond_request', { targetCode: partnerCode, user });
+    setStatus('idle');
 
-    // State update handled by bond_accepted event
-    setLoading(false);
+    // Timeout fallback: if no server response in 8s, show error
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setStatus('error');
+    }, 8000);
+
+    // Clear timeout once we get a response
+    const clearOnResponse = () => clearTimeout(timeout);
+    socket.once('bond_request_sent', clearOnResponse);
+    socket.once('bond_partner_offline', clearOnResponse);
+
+    socket.emit('bond_request', { targetCode: partnerCode.trim(), user });
   };
 
   const handleAccept = () => {
     if (!incomingRequest) return;
     socket.emit('bond_accept', { targetCode: incomingRequest.seedCode, user });
     onUpdateUser({ ...user, partnerId: incomingRequest.seedCode });
+  };
+
+  const renderStatus = () => {
+    if (status === 'sent') return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 text-sage-600 text-sm bg-sage-50 border border-sage-200 rounded-[20px] px-5 py-3"
+      >
+        <Clock size={16} className="shrink-0" />
+        <span>Bond request sent! Waiting for <strong>{partnerCode}</strong> to accept…</span>
+      </motion.div>
+    );
+    if (status === 'partner_offline') return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-[20px] px-5 py-3"
+      >
+        <WifiOff size={16} className="shrink-0" />
+        <span>Partner is not online yet. Ask them to open the app and try again.</span>
+      </motion.div>
+    );
+    if (status === 'error') return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-200 rounded-[20px] px-5 py-3"
+      >
+        <WifiOff size={16} className="shrink-0" />
+        <span>Connection error. Please refresh and try again.</span>
+      </motion.div>
+    );
+    return null;
   };
 
   return (
@@ -125,7 +184,7 @@ export default function BondScreen({ user, onUpdateUser }: Props) {
             type="text"
             placeholder="e.g. Green-Willow-123"
             value={partnerCode}
-            onChange={(e) => setPartnerCode(e.target.value)}
+            onChange={(e) => { setPartnerCode(e.target.value); setStatus('idle'); }}
             onKeyDown={(e) => e.key === 'Enter' && handleBond()}
             className="w-full bg-white/80 backdrop-blur-md border border-sage-200 rounded-[28px] px-6 py-5 outline-none focus:border-sage-500 focus:bg-white text-center font-mono tracking-wide text-sage-900 shadow-sm transition-all text-base"
           />
@@ -142,6 +201,9 @@ export default function BondScreen({ user, onUpdateUser }: Props) {
               'Connect Sanctuary'
             )}
           </button>
+
+          {/* Status feedback */}
+          {renderStatus()}
         </div>
       </motion.div>
     </div>
