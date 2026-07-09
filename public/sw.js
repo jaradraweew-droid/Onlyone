@@ -1,72 +1,39 @@
-// ─── OnlyOne Enhanced Service Worker ────────────────────────────────
-// Handles push notifications, notification actions, caching, and
-// subscription lifecycle management.
+// ─── OnlyOne Service Worker ─────────────────────────────────────────
+// Handles push notifications, notification actions, and click routing.
+// Kept minimal and robust — no precaching to avoid install failures.
 
-const CACHE_NAME = 'onlyone-v1';
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
+const SW_VERSION = 'onlyone-sw-v2';
 
-// ─── Install: Precache App Shell ────────────────────────────────────
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
+// ─── Install: Skip Waiting (instant activation) ────────────────────
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// ─── Activate: Clean Old Caches ─────────────────────────────────────
+// ─── Activate: Claim Clients ────────────────────────────────────────
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
-});
-
-// ─── Fetch: Network-First with Cache Fallback ───────────────────────
-self.addEventListener('fetch', (event) => {
-  // Only cache GET requests for same-origin navigation/assets
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response.ok && event.request.url.startsWith(self.location.origin)) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || new Response('Offline', { status: 503 })))
-  );
+  event.waitUntil(self.clients.claim());
 });
 
 // ─── Push: Show Notification ────────────────────────────────────────
 self.addEventListener('push', (event) => {
-  let data = { title: 'OnlyOne', body: 'You have a new notification', icon: '/icons/icon-192.png' };
+  let data = {
+    title: 'OnlyOne',
+    body: 'You have a new notification',
+  };
 
   try {
     if (event.data) {
       data = { ...data, ...event.data.json() };
     }
   } catch (e) {
-    console.error('Failed to parse push data:', e);
+    console.error('SW: Failed to parse push data:', e);
   }
 
   const notificationType = data.type || 'general';
 
   // Group notifications by type using tags
   const tagMap = {
-    message: 'onlyone-messages',
+    messages: 'onlyone-messages',
     mood: 'onlyone-mood',
     leaf: 'onlyone-leaf',
     pet: 'onlyone-pet',
@@ -77,10 +44,9 @@ self.addEventListener('push', (event) => {
 
   // Build notification actions based on type
   let actions = [];
-  if (notificationType === 'message') {
+  if (notificationType === 'messages') {
     actions = [
       { action: 'open_chat', title: '💬 Open Chat' },
-      { action: 'dismiss', title: 'Dismiss' },
     ];
   } else if (notificationType === 'leaf') {
     actions = [
@@ -92,13 +58,12 @@ self.addEventListener('push', (event) => {
     ];
   }
 
-  // Determine if we should use silent mode (custom sound will be played client-side)
+  // Custom sound: set silent so client-side can play our synthesized sound
   const useCustomSound = data.soundMode === 'custom';
 
   const options = {
     body: data.body,
-    icon: data.icon || '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: data.icon || undefined,
     tag: tag,
     renotify: true,
     vibrate: [100, 50, 100, 50, 200],
@@ -109,18 +74,14 @@ self.addEventListener('push', (event) => {
       soundMode: data.soundMode || 'default',
       url: data.url || '/',
     },
-    // If custom sound mode, set silent so we can play our own sound client-side
     silent: useCustomSound,
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  const showPromise = self.registration.showNotification(data.title, options);
 
-  // If custom sound, notify the active client to play the sound
-  if (useCustomSound && data.soundId) {
-    event.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+  // If custom sound, notify client windows to play the synthesized sound
+  const soundPromise = (useCustomSound && data.soundId)
+    ? self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
         clients.forEach((client) => {
           client.postMessage({
             type: 'PLAY_NOTIFICATION_SOUND',
@@ -128,8 +89,9 @@ self.addEventListener('push', (event) => {
           });
         });
       })
-    );
-  }
+    : Promise.resolve();
+
+  event.waitUntil(Promise.all([showPromise, soundPromise]));
 });
 
 // ─── Notification Click: Route to Appropriate Screen ────────────────
@@ -138,14 +100,15 @@ self.addEventListener('notificationclick', (event) => {
 
   const action = event.action;
   const notifData = event.notification.data || {};
-  let targetUrl = '/';
 
-  if (action === 'open_chat' || notifData.type === 'message') {
+  // "Dismiss" action — just close
+  if (action === 'dismiss') return;
+
+  let targetUrl = '/';
+  if (action === 'open_chat' || notifData.type === 'messages') {
     targetUrl = '/?tab=chat';
   } else if (action === 'open_pet' || notifData.type === 'pet') {
     targetUrl = '/?tab=pet';
-  } else if (action === 'dismiss') {
-    return; // Just close
   }
 
   event.waitUntil(
@@ -168,14 +131,17 @@ self.addEventListener('notificationclick', (event) => {
 
 // ─── Push Subscription Change: Auto Re-subscribe ────────────────────
 self.addEventListener('pushsubscriptionchange', (event) => {
+  if (!event.oldSubscription || !event.oldSubscription.options) return;
   event.waitUntil(
-    self.registration.pushManager.subscribe(event.oldSubscription.options).then((newSubscription) => {
-      // Re-register with the server
-      return fetch('/api/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({ subscription: newSubscription }),
-        headers: { 'content-type': 'application/json' },
-      });
-    })
+    self.registration.pushManager
+      .subscribe(event.oldSubscription.options)
+      .then((newSub) =>
+        fetch('/api/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({ subscription: newSub }),
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+      .catch((err) => console.error('SW: Re-subscribe failed:', err))
   );
 });

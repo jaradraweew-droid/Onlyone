@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, BellOff, Smartphone, X } from 'lucide-react';
+import { Bell, Smartphone, X, AlertCircle } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +19,7 @@ export default function NotificationPermissionModal({
 }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const needsIOSInstall = isiOS && !isPWA;
 
@@ -27,9 +28,38 @@ export default function NotificationPermissionModal({
       setShowIOSGuide(true);
       return;
     }
+
     setIsLoading(true);
-    await onEnable();
+    setError(null);
+
+    try {
+      // Set a UI timeout — if it takes more than 8 seconds, something is wrong
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+        setError('Taking too long. Please try again or check your browser settings.');
+      }, 8000);
+
+      const result = await onEnable();
+      clearTimeout(timeoutId);
+      setIsLoading(false);
+
+      if (!result) {
+        // User denied or something went wrong
+        // Modal will be closed by the hook, but show brief feedback
+        setError('Notifications were not enabled. You can change this in Settings later.');
+        setTimeout(() => onDismiss(), 2500);
+      }
+      // If result is true, the hook already closed the modal
+    } catch {
+      setIsLoading(false);
+      setError('Something went wrong. Please try again later.');
+    }
+  };
+
+  const handleClose = () => {
+    setError(null);
     setIsLoading(false);
+    onDismiss();
   };
 
   return (
@@ -42,7 +72,7 @@ export default function NotificationPermissionModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-            onClick={onDismiss}
+            onClick={handleClose}
           />
 
           {/* Modal */}
@@ -88,6 +118,14 @@ export default function NotificationPermissionModal({
                   </div>
                 </div>
 
+                {/* Error message */}
+                {error && (
+                  <div className="flex items-center gap-2 bg-amber-50 rounded-2xl px-4 py-3 mb-4 text-left">
+                    <AlertCircle size={16} className="text-amber-500 shrink-0" />
+                    <p className="text-amber-700 text-[12px] leading-relaxed">{error}</p>
+                  </div>
+                )}
+
                 {/* Buttons */}
                 <div className="space-y-3">
                   <button
@@ -96,7 +134,10 @@ export default function NotificationPermissionModal({
                     className="w-full bg-sage-600 text-white rounded-full py-3.5 font-semibold text-[15px] hover:bg-sage-700 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <>
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Enabling...</span>
+                      </>
                     ) : (
                       <>
                         <Bell size={16} />
@@ -105,8 +146,9 @@ export default function NotificationPermissionModal({
                     )}
                   </button>
                   <button
-                    onClick={onDismiss}
-                    className="w-full text-sage-400 rounded-full py-3 font-medium text-[14px] hover:text-sage-600 hover:bg-sage-50 transition-all"
+                    onClick={handleClose}
+                    disabled={isLoading}
+                    className="w-full text-sage-400 rounded-full py-3 font-medium text-[14px] hover:text-sage-600 hover:bg-sage-50 transition-all disabled:opacity-40"
                   >
                     Maybe Later
                   </button>
@@ -114,7 +156,7 @@ export default function NotificationPermissionModal({
               </div>
             ) : (
               /* ── iOS Installation Guide ───────────────────── */
-              <div className="p-6 text-center">
+              <div className="p-6 text-center relative">
                 <button
                   onClick={() => setShowIOSGuide(false)}
                   className="absolute top-4 right-4 w-8 h-8 rounded-full bg-sage-50 flex items-center justify-center text-sage-400 hover:text-sage-600 transition-colors"
@@ -132,7 +174,7 @@ export default function NotificationPermissionModal({
                 </h3>
 
                 <p className="text-sage-500 text-sm leading-relaxed mb-6 px-2">
-                  On iPhone, notifications require the app to be installed on your Home Screen.
+                  On iPhone &amp; iPad, notifications require the app to be installed on your Home Screen.
                 </p>
 
                 <div className="bg-sage-50 rounded-2xl p-4 text-left space-y-4 mb-6">
@@ -145,7 +187,7 @@ export default function NotificationPermissionModal({
                   <div className="flex items-start gap-3">
                     <span className="w-6 h-6 rounded-full bg-white text-sage-600 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 shadow-sm">2</span>
                     <p className="text-sage-700 text-[13px] leading-relaxed">
-                      Scroll down and tap <strong>"Add to Home Screen"</strong>
+                      Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong>
                     </p>
                   </div>
                   <div className="flex items-start gap-3">
@@ -157,7 +199,7 @@ export default function NotificationPermissionModal({
                 </div>
 
                 <button
-                  onClick={onDismiss}
+                  onClick={handleClose}
                   className="w-full text-sage-500 rounded-full py-3 font-medium text-[14px] hover:text-sage-700 hover:bg-sage-50 transition-all"
                 >
                   Got it

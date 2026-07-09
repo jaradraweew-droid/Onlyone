@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { urlBase64ToUint8Array } from '../utils';
 import { playNotificationSound } from '../notificationSounds';
 
@@ -61,21 +61,80 @@ function setPromptDismissed(): void {
   localStorage.setItem(PROMPT_DISMISSED_KEY, 'true');
 }
 
+/**
+ * Detect if we're running on an iOS/iPadOS device.
+ * - Checks UA for iPhone/iPad/iPod
+ * - Also checks for iPadOS 13+ which reports as 'MacIntel' but has touch
+ * - Excludes actual Macs by checking screen size + touch points
+ */
 function detectiOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const ua = navigator.userAgent;
+
+  // Direct match for iPhone/iPad/iPod in UA
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+
+  // iPadOS 13+ reports as 'MacIntel' with touch support
+  // Distinguish from actual MacBooks: iPads have maxTouchPoints > 1 AND
+  // typically have screen width <= 1366 (iPad Pro max). MacBooks always have 0 touch points
+  // in Safari (unless they have a Touch Bar which reports 1).
+  if (
+    navigator.platform === 'MacIntel' &&
+    navigator.maxTouchPoints > 1 &&
+    // Additional check: real Macs never report > 5 touch points
+    // and iPadOS always has exactly 5
+    navigator.maxTouchPoints >= 5
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
+/**
+ * Detect if the app is running as an installed PWA (standalone mode).
+ */
 function isStandalone(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+}
+
+/**
+ * Check if the browser actually supports Web Push notifications.
+ * Some browsers have `Notification` in window but don't support push.
+ */
+function supportsPushNotifications(): boolean {
+  return (
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window
+  );
+}
+
+/**
+ * Check if we're in Safari (macOS or iOS).
+ * Safari on macOS supports notifications, but iOS Safari (not PWA) does not.
+ */
+function isSafari(): boolean {
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|Edg/.test(ua);
+}
+
+// ─── Timeout helper ─────────────────────────────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout: ${label} took longer than ${ms}ms`)), ms)
+    ),
+  ]);
 }
 
 // ─── Hook ───────────────────────────────────────────────────────────
 
 export function useNotifications(userId: string | null) {
   const [permission, setPermission] = useState<PermissionState>(() => {
-    if (!('Notification' in window)) return 'unsupported';
+    if (!supportsPushNotifications()) return 'unsupported';
     return Notification.permission as PermissionState;
   });
 
@@ -84,22 +143,34 @@ export function useNotifications(userId: string | null) {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isiOS, setIsiOS] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
+  const subscribingRef = useRef(false);
 
   // Detect platform on mount
   useEffect(() => {
-    setIsiOS(detectiOS());
+    const ios = detectiOS();
+    setIsiOS(ios);
     setIsPWA(isStandalone());
+
+    // On iOS Safari (not PWA), push is simply not supported
+    if (ios && !isStandalone()) {
+      setPermission('unsupported');
+    }
   }, []);
 
   // Determine if we should show the first-time modal
   useEffect(() => {
-    if (
-      userId &&
-      permission === 'default' &&
-      !isPromptDismissed() &&
-      'Notification' in window
-    ) {
-      // Small delay so the app renders first
+    if (!userId) return;
+
+    const ios = detectiOS();
+    const pwa = isStandalone();
+
+    // On iOS non-PWA: show modal (it will show the install guide)
+    // On supported platforms: show modal if permission not yet decided
+    const shouldShow =
+      (ios && !pwa && !isPromptDismissed()) || // iOS non-PWA: show install guide
+      (permission === 'default' && !isPromptDismissed() && supportsPushNotifications());
+
+    if (shouldShow) {
       const timer = setTimeout(() => setShowPermissionModal(true), 1500);
       return () => clearTimeout(timer);
     }
@@ -122,39 +193,78 @@ export function useNotifications(userId: string | null) {
     };
   }, []);
 
-  // ─── Push Subscription ────────────────────────────────────────
+  // ─── Push Subscription (non-blocking, with timeout) ───────────
 
   const subscribeToPush = useCallback(async () => {
-    if (!userId || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!userId) return;
+    if (!supportsPushNotifications()) return;
+    if (subscribingRef.current) return; // Prevent double-subscribe
+
+    subscribingRef.current = true;
 
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      // Wait for the service worker to be ready
-      await navigator.serviceWorker.ready;
+      // Step 1: Register service worker (5s timeout)
+      const registration = await withTimeout(
+        navigator.serviceWorker.register('/sw.js'),
+        5000,
+        'SW registration'
+      );
 
-      const res = await fetch('/api/vapidPublicKey');
-      const publicVapidKey = await res.text();
+      // Step 2: Wait for SW to be ready (10s timeout)
+      await withTimeout(
+        navigator.serviceWorker.ready,
+        10000,
+        'SW ready'
+      );
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
-      });
+      // Step 3: Check existing subscription first
+      let subscription = await registration.pushManager.getSubscription();
 
-      await fetch('/api/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({ subscription, userId }),
-        headers: { 'content-type': 'application/json' },
-      });
+      if (!subscription) {
+        // Step 4: Get VAPID key (5s timeout)
+        const res = await withTimeout(
+          fetch('/api/vapidPublicKey'),
+          5000,
+          'VAPID key fetch'
+        );
+        const publicVapidKey = await res.text();
+
+        // Step 5: Subscribe (10s timeout)
+        subscription = await withTimeout(
+          registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
+          }),
+          10000,
+          'Push subscribe'
+        );
+      }
+
+      // Step 6: Send subscription to server (5s timeout)
+      await withTimeout(
+        fetch('/api/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({ subscription, userId }),
+          headers: { 'content-type': 'application/json' },
+        }),
+        5000,
+        'Server subscribe'
+      );
 
       setIsSubscribed(true);
+      console.log('Push notification subscription successful');
     } catch (e) {
-      console.error('Failed to subscribe to push notifications:', e);
+      console.error('Push subscription failed:', e);
+      // Don't throw — subscription failure should not block the UI
+    } finally {
+      subscribingRef.current = false;
     }
   }, [userId]);
 
-  // Auto-subscribe when permission is already granted
+  // Auto-subscribe when permission is already granted (in background)
   useEffect(() => {
     if (userId && permission === 'granted' && !isSubscribed) {
+      // Fire and forget — don't block UI
       subscribeToPush();
     }
   }, [userId, permission, isSubscribed, subscribeToPush]);
@@ -162,21 +272,26 @@ export function useNotifications(userId: string | null) {
   // ─── Permission Request (called by modal) ─────────────────────
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (!('Notification' in window)) return false;
+    if (!supportsPushNotifications()) return false;
 
     try {
       const result = await Notification.requestPermission();
       setPermission(result as PermissionState);
+      setShowPermissionModal(false);
 
       if (result === 'granted') {
-        await subscribeToPush();
-        setShowPermissionModal(false);
+        // Subscribe in background — DON'T await it here
+        // This is what caused the freeze: awaiting SW registration inside the modal
+        subscribeToPush();
         return true;
       }
+
+      return false;
     } catch (e) {
-      console.error('Failed to request notification permission:', e);
+      console.error('Permission request failed:', e);
+      setShowPermissionModal(false);
+      return false;
     }
-    return false;
   }, [subscribeToPush]);
 
   // ─── Dismiss Modal ────────────────────────────────────────────
@@ -217,18 +332,16 @@ export function useNotifications(userId: string | null) {
 
   const toggleMasterSwitch = useCallback(async () => {
     if (permission === 'granted') {
-      // Can't revoke via API, guide user to browser settings
       return 'open-settings' as const;
-    } else if (permission === 'default') {
+    } else if (permission === 'default' && supportsPushNotifications()) {
       const granted = await requestPermission();
       return granted ? 'granted' as const : 'denied' as const;
     } else {
-      // Permission denied — need to go to browser settings
       return 'open-settings' as const;
     }
   }, [permission, requestPermission]);
 
-  // ─── Sync preferences to server on first load ─────────────────
+  // ─── Sync preferences to server on mount ──────────────────────
 
   useEffect(() => {
     if (userId && permission === 'granted') {
@@ -243,7 +356,7 @@ export function useNotifications(userId: string | null) {
       }).catch(() => { /* silent */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // Only on mount/user change
+  }, [userId]);
 
   return {
     permission,
