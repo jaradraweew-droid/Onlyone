@@ -1,11 +1,11 @@
-import type { Mood } from './types';
+import type { CustomMood } from './types';
 
-/** Mood options used in check-in and settings. */
-export const MOODS: { value: Mood; color: string; label: string }[] = [
-  { value: 'great', color: 'bg-mood-great', label: 'Great' },
-  { value: 'good', color: 'bg-mood-good', label: 'Good' },
-  { value: 'okay', color: 'bg-mood-okay', label: 'Okay' },
-  { value: 'tired', color: 'bg-mood-tired', label: 'Tired' },
+/** Default Mood options used in check-in and settings. */
+export const DEFAULT_MOODS: CustomMood[] = [
+  { id: 'm-great', value: 'great', color: '#4A5D4E', label: 'Great' },
+  { id: 'm-good', value: 'good', color: '#7A8B7D', label: 'Good' },
+  { id: 'm-okay', value: 'okay', color: '#A0B0A3', label: 'Okay' },
+  { id: 'm-tired', value: 'tired', color: '#C3D5C5', label: 'Tired' },
 ];
 
 /** Reaction emoji set used in chat and timeline. */

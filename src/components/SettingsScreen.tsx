@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { User, Mood } from '../types';
+import type { User, Mood, CustomMood } from '../types';
 import type { NotificationPreferences, PermissionState } from '../hooks/useNotifications';
-import { AlertTriangle, User as UserIcon, Calendar, Bell, BellOff, Volume2, Moon, Clock, CheckCircle, XCircle, CircleDot } from 'lucide-react';
+import { AlertTriangle, User as UserIcon, Calendar, Bell, BellOff, Volume2, Moon, Clock, CheckCircle, XCircle, CircleDot, Pencil, Plus } from 'lucide-react';
 import { socket } from '../socket';
-import { MOODS } from '../constants';
+import { DEFAULT_MOODS } from '../constants';
 import { NOTIFICATION_SOUNDS, playNotificationSound, isAudioSupported } from '../notificationSounds';
 
 interface NotificationProps {
@@ -86,6 +86,8 @@ function PermissionBadge({ permission }: { permission: PermissionState }) {
 export default function SettingsScreen({ user, onUpdateUser, notificationProps }: Props) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [playingSoundId, setPlayingSoundId] = useState<string | null>(null);
+  const [editingMood, setEditingMood] = useState<CustomMood | null>(null);
+  const [isAddingMood, setIsAddingMood] = useState(false);
 
   const { preferences, updatePreferences, permission, toggleMasterSwitch } = notificationProps;
   const isNotifEnabled = permission === 'granted';
@@ -99,11 +101,24 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
     setShowArchiveConfirm(false);
   };
 
-  const setMood = (mood: Mood) => {
+  const setMood = (mood: CustomMood | string) => {
     onUpdateUser({ ...user, mood });
     if (user.partnerId) {
       socket.emit('update_mood', { from: user.seedCode, to: user.partnerId, mood });
     }
+  };
+
+  const handleSaveMood = (moodToSave: CustomMood) => {
+    const currentMoods = user.customMoods || DEFAULT_MOODS;
+    let newMoods;
+    if (isAddingMood) {
+      newMoods = [...currentMoods, { ...moodToSave, id: `m-${Date.now()}` }];
+    } else {
+      newMoods = currentMoods.map(m => m.id === moodToSave.id ? moodToSave : m);
+    }
+    onUpdateUser({ ...user, customMoods: newMoods });
+    setEditingMood(null);
+    setIsAddingMood(false);
   };
 
   const handleMasterToggle = async () => {
@@ -355,31 +370,57 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
         {/* ─── Mood Section ──────────────────────────────────────── */}
         <div className="bg-white rounded-[28px] md:rounded-[36px] p-6 md:p-7 shadow-sm border border-sage-100 mb-6">
           <h4 className="text-[11px] font-bold text-sage-400 uppercase tracking-widest mb-6">How are you feeling?</h4>
-          <div className="flex justify-between items-center px-2">
-            {MOODS.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setMood(m.value)}
-                className="flex flex-col items-center gap-3 group"
-                aria-label={m.label}
-              >
-                <div
-                  className={`w-12 h-12 md:w-14 md:h-14 rounded-full ${m.color} flex items-center justify-center transition-all duration-300 ${
-                    user.mood === m.value
-                      ? 'ring-4 ring-sage-200 ring-offset-4 ring-offset-white scale-110 shadow-lg'
-                      : 'opacity-60 group-hover:opacity-100 group-hover:scale-105'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span
-                  className={`text-[13px] transition-colors ${
-                    user.mood === m.value ? 'text-sage-900 font-semibold' : 'text-sage-400'
-                  }`}
-                >
-                  {m.label}
-                </span>
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-4 px-2">
+            {(user.customMoods || DEFAULT_MOODS).map((m) => {
+              const isSelected = typeof user.mood === 'object' ? user.mood.id === m.id : user.mood === m.value;
+              return (
+                <div key={m.id} className="relative flex flex-col items-center gap-3 group">
+                  <button
+                    onClick={() => setMood(m)}
+                    className="flex flex-col items-center gap-3"
+                    aria-label={m.label}
+                  >
+                    <div
+                      className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isSelected
+                          ? 'ring-4 ring-sage-200 ring-offset-4 ring-offset-white scale-110 shadow-lg'
+                          : 'opacity-60 group-hover:opacity-100 group-hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: m.color }}
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={`text-[13px] transition-colors ${
+                        isSelected ? 'text-sage-900 font-semibold' : 'text-sage-400'
+                      }`}
+                    >
+                      {m.label}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => { setEditingMood(m); setIsAddingMood(false); }}
+                    className="absolute -top-1 -right-1 bg-white rounded-full p-1.5 shadow-md border border-sage-100 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sage-50 z-10"
+                    aria-label={`Edit ${m.label}`}
+                  >
+                    <Pencil size={12} className="text-sage-500" />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Add Button */}
+            <button
+              onClick={() => { setEditingMood({ id: '', value: '', label: '', color: '#A0B0A3' }); setIsAddingMood(true); }}
+              className="flex flex-col items-center gap-3 group"
+              aria-label="Add new feeling"
+            >
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border-2 border-dashed border-sage-300 flex items-center justify-center text-sage-400 group-hover:border-sage-500 group-hover:text-sage-500 transition-colors">
+                <Plus size={24} />
+              </div>
+              <span className="text-[13px] text-sage-400 group-hover:text-sage-500">
+                Add New
+              </span>
+            </button>
           </div>
         </div>
 
@@ -458,6 +499,63 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
           )}
         </div>
       </div>
+
+      {/* ─── Mood Edit Modal ────────────────────────────────────── */}
+      {editingMood && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sage-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-xl font-serif text-sage-900 mb-6 text-center">
+              {isAddingMood ? 'Add New Feeling' : 'Edit Feeling'}
+            </h3>
+            
+            <div className="space-y-5">
+              <div>
+                <label className="block text-[12px] font-bold text-sage-500 uppercase tracking-wider mb-2">
+                  Feeling Name
+                </label>
+                <input
+                  type="text"
+                  value={editingMood.label}
+                  onChange={(e) => setEditingMood({ ...editingMood, label: e.target.value, value: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                  className="w-full bg-sage-50 border border-sage-200 rounded-xl px-4 py-3 text-sage-900 font-medium focus:ring-2 focus:ring-sage-300 outline-none"
+                  placeholder="e.g. Excited"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[12px] font-bold text-sage-500 uppercase tracking-wider mb-2">
+                  Color
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="color"
+                    value={editingMood.color.startsWith('#') ? editingMood.color : '#A0B0A3'}
+                    onChange={(e) => setEditingMood({ ...editingMood, color: e.target.value })}
+                    className="w-12 h-12 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                  />
+                  <span className="text-sage-700 font-medium">{editingMood.color}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => { setEditingMood(null); setIsAddingMood(false); }}
+                className="flex-1 bg-sage-50 text-sage-700 rounded-2xl py-3.5 font-semibold hover:bg-sage-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveMood(editingMood)}
+                disabled={!editingMood.label.trim()}
+                className="flex-1 bg-sage-800 text-white rounded-2xl py-3.5 font-semibold hover:bg-sage-900 transition-colors disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { IMAGE_MAX_SIZE, IMAGE_QUALITY, MOODS } from './constants';
+import { IMAGE_MAX_SIZE, IMAGE_QUALITY, DEFAULT_MOODS } from './constants';
 
 // ─── Seed Code Generation ───────────────────────────────────────────
 
@@ -20,14 +20,15 @@ export function generateId(): string {
 
 // ─── Mood Helpers ───────────────────────────────────────────────────
 
-/** Returns the Tailwind background color class for a mood string. */
+/** Returns the hex color or Tailwind background color class for a mood string. */
 export function getMoodColor(mood: string): string {
-  const found = MOODS.find((m) => m.value === mood);
-  return found?.color || 'bg-mood-good';
+  const found = DEFAULT_MOODS.find((m) => m.value === mood);
+  return found?.color || '#7A8B7D';
 }
 
 /** Returns a capitalized mood label. */
 export function getMoodLabel(mood: string): string {
+  if (!mood) return 'Unknown';
   return mood.charAt(0).toUpperCase() + mood.slice(1);
 }
 

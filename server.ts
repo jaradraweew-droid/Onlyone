@@ -105,6 +105,16 @@ interface PetActionData {
   action: Record<string, unknown>;
 }
 
+interface RadarUser {
+  socketId: string;
+  userId: string;
+  userName: string;
+  seedCode: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
+
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const vapidContactEmail = process.env.VAPID_CONTACT_EMAIL;
@@ -121,6 +131,22 @@ webpush.setVapidDetails(
 
 function getPairId(code1: string, code2: string) {
   return [code1, code2].sort().join('_');
+}
+
+// ─── Haversine Distance Calculation ──────────────────────────────────
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth radius in meters
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+  const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c;
 }
 
 // ─── Quiet Hours Check ──────────────────────────────────────────────
@@ -292,6 +318,7 @@ async function startServer() {
   const connectedUsers = new Map<string, JoinBondUser>(); // socketId -> userData
   const partnerCodes = new Map<string, string>(); // userCode -> partnerCode
   const latestMoods = new Map<string, string>(); // userCode -> mood
+  const radarUsers = new Map<string, RadarUser>(); // socketId -> RadarUser
 
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
@@ -395,12 +422,17 @@ async function startServer() {
       }, 'leaf');
     });
 
-    socket.on('update_mood', (data: { from: string, to: string, mood: string }) => {
+    socket.on('update_mood', (data: { from: string, to: string, mood: any }) => {
       latestMoods.set(data.from, data.mood);
       socket.to(data.to).emit('partner_mood_changed', data.mood);
+      
+      const moodLabel = typeof data.mood === 'object' && data.mood !== null 
+        ? data.mood.label 
+        : data.mood;
+        
       void sendPushNotification(data.to, {
         title: "Mood Updated",
-        body: `Partner is feeling ${data.mood}`,
+        body: `Partner is feeling ${moodLabel}`,
         icon: "/icons/icon-192.png"
       }, 'mood');
     });
@@ -506,6 +538,55 @@ async function startServer() {
       }
     });
 
+    // ─── Radar Events ───────────────────────────────────────────
+    socket.on('radar_scan', (data: { userId: string; userName: string; seedCode: string; latitude: number; longitude: number }) => {
+      radarUsers.set(socket.id, {
+        socketId: socket.id,
+        userId: data.userId,
+        userName: data.userName,
+        seedCode: data.seedCode,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        timestamp: Date.now()
+      });
+
+      const nearby: Array<{ userName: string; seedCode: string; distance: number }> = [];
+      const now = Date.now();
+      
+      for (const [otherSocketId, otherUser] of radarUsers.entries()) {
+        if (otherSocketId === socket.id) continue;
+        
+        // Cleanup stale radar users (> 60 seconds)
+        if (now - otherUser.timestamp > 60000) {
+          radarUsers.delete(otherSocketId);
+          continue;
+        }
+
+        const distance = getDistanceInMeters(data.latitude, data.longitude, otherUser.latitude, otherUser.longitude);
+        if (distance <= 100) { // 100 meters radius
+          const distanceRounded = Math.round(distance);
+          nearby.push({
+            userName: otherUser.userName,
+            seedCode: otherUser.seedCode,
+            distance: distanceRounded
+          });
+          
+          // Notify the other user about us too
+          io.to(otherSocketId).emit('radar_results', [{
+            userName: data.userName,
+            seedCode: data.seedCode,
+            distance: distanceRounded
+          }]);
+        }
+      }
+
+      socket.emit('radar_results', nearby);
+    });
+
+    socket.on('radar_stop', () => {
+      radarUsers.delete(socket.id);
+    });
+
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
       const disconnectedUser = connectedUsers.get(socket.id);
@@ -514,6 +595,7 @@ async function startServer() {
         partnerCodes.delete(disconnectedUser.seedCode);
         connectedUsers.delete(socket.id);
       }
+      radarUsers.delete(socket.id);
     });
   });
 

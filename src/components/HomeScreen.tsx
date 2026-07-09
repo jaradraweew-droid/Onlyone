@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { User, Message, Mood, Pet, PetStatus, PetAction, PetActionType } from '../types';
+import type { User, Message, Mood, CustomMood, Pet, PetStatus, PetAction, PetActionType } from '../types';
 import type { NotificationPreferences, PermissionState } from '../hooks/useNotifications';
 import ChatScreen from './ChatScreen';
 import TimelineScreen from './TimelineScreen';
@@ -13,7 +13,7 @@ import { Menu, X, Smile } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import LeafAnimation from './LeafAnimation';
 import { socket } from '../socket';
-import { MOODS } from '../constants';
+import { DEFAULT_MOODS } from '../constants';
 import { calculateAnniversary, getMoodColor, getMoodLabel, generateId } from '../utils';
 import { calculateDecayedStatus, createDefaultPetStatus } from '../petUtils';
 
@@ -37,7 +37,7 @@ const DEFAULT_ROOM_NAME = 'Sanctuary';
 export default function HomeScreen({ user, onUpdateUser, notificationProps }: Props) {
   const [tab, setTab] = useState<TabId>('chat');
   const [showLeaves, setShowLeaves] = useState(false);
-  const [partnerMood, setPartnerMood] = useState<string>('good');
+  const [partnerMood, setPartnerMood] = useState<any>('good');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isEditingRoomName, setIsEditingRoomName] = useState(false);
   const [roomNameInput, setRoomNameInput] = useState(user.roomName || DEFAULT_ROOM_NAME);
@@ -60,7 +60,7 @@ export default function HomeScreen({ user, onUpdateUser, notificationProps }: Pr
       setTimeout(() => setShowLeaves(false), 4000);
     };
 
-    const onPartnerMood = (mood: string) => setPartnerMood(mood);
+    const onPartnerMood = (mood: any) => setPartnerMood(mood);
 
     const onChatHistory = (history: Message[]) => setMessages(history);
 
@@ -165,7 +165,7 @@ export default function HomeScreen({ user, onUpdateUser, notificationProps }: Pr
     }
   };
 
-  const handleSetMood = (mood: Mood) => {
+  const handleSetMood = (mood: CustomMood | string) => {
     onUpdateUser({ ...user, mood });
     if (user.partnerId) {
       socket.emit('update_mood', { from: user.seedCode, to: user.partnerId, mood });
@@ -332,8 +332,11 @@ export default function HomeScreen({ user, onUpdateUser, notificationProps }: Pr
                 )}
               </div>
               <p className="text-[10px] sm:text-xs text-sage-700 flex items-center gap-1.5 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${getMoodColor(partnerMood)} shadow-sm`} />
-                Partner is feeling {getMoodLabel(partnerMood)}
+                <span 
+                  className="w-2 h-2 rounded-full shadow-sm"
+                  style={{ backgroundColor: typeof partnerMood === 'object' && partnerMood !== null ? partnerMood.color : getMoodColor(partnerMood) }}
+                />
+                Partner is feeling {typeof partnerMood === 'object' && partnerMood !== null ? partnerMood.label : getMoodLabel(partnerMood)}
               </p>
             </div>
           </div>
@@ -381,15 +384,16 @@ export default function HomeScreen({ user, onUpdateUser, notificationProps }: Pr
               </button>
               <h4 className="text-[11px] sm:text-[12px] font-bold text-sage-500 uppercase tracking-widest mb-3 sm:mb-4">Daily Check-in</h4>
               <div className="flex justify-between items-center px-1 max-w-sm">
-                {MOODS.map((m) => (
+                {(user.customMoods || DEFAULT_MOODS).map((m) => (
                   <button
-                    key={m.value}
-                    onClick={() => handleSetMood(m.value)}
+                    key={m.id}
+                    onClick={() => handleSetMood(m)}
                     className="flex flex-col items-center gap-2 sm:gap-2.5 group"
                     type="button"
                   >
                     <div
-                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${m.color} flex items-center justify-center transition-all duration-300 opacity-80 group-hover:opacity-100 group-hover:scale-110 shadow-sm group-hover:shadow-md`}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-300 opacity-80 group-hover:opacity-100 group-hover:scale-110 shadow-sm group-hover:shadow-md"
+                      style={{ backgroundColor: m.color }}
                     />
                     <span className="text-[10px] sm:text-[12px] font-medium text-sage-500 group-hover:text-sage-900 transition-colors">
                       {m.label}

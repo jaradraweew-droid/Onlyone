@@ -1,4 +1,11 @@
-export type Mood = 'great' | 'good' | 'okay' | 'tired';
+export type Mood = string;
+
+export interface CustomMood {
+  id: string;
+  value: string;
+  label: string;
+  color: string;
+}
 
 export type PetType = 'cat' | 'dog';
 
@@ -8,7 +15,8 @@ export interface User {
   id: string;
   name: string;
   seedCode: string;
-  mood: Mood;
+  mood: Mood | CustomMood;
+  customMoods?: CustomMood[];
   partnerId?: string | null;
   archivedAt?: number | null;
   anniversaryDate?: number | null;
