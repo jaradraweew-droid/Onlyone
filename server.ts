@@ -5,8 +5,12 @@ import { createServer as createViteServer } from "vite";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { db } from "./src/firebase";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, collection, getDocs, query, orderBy, addDoc, limit, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from "firebase/firestore";
 import webpush from "web-push";
+
+interface MessageComment {
+  [key: string]: unknown;
+}
 
 interface SendMessageData {
   from: string;
@@ -20,7 +24,7 @@ interface SendMessageData {
     timestamp: number;
     status: string;
     reactions: Record<string, string[]>;
-    comments: any[];
+    comments: MessageComment[];
     replyTo?: { id: string; text: string; senderId: string };
   };
 }
@@ -78,6 +82,27 @@ interface JoinBondUser {
   seedCode: string;
   mood: string;
   [key: string]: unknown;
+}
+
+interface PetProposeData {
+  from: string;
+  to: string;
+  pet: Record<string, unknown>;
+  proposerName: string;
+}
+
+interface PetAcceptData {
+  from: string;
+  to: string;
+  pet: Record<string, unknown>;
+  status: Record<string, unknown>;
+}
+
+interface PetActionData {
+  from: string;
+  to: string;
+  petId: string;
+  action: Record<string, unknown>;
 }
 
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -228,9 +253,10 @@ async function startServer() {
           await webpush.sendNotification(data.subscription, JSON.stringify(enrichedPayload));
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Handle stale subscriptions (410 Gone or 404 Not Found)
-      if (e?.statusCode === 410 || e?.statusCode === 404) {
+      const err = e as { statusCode?: number };
+      if (err?.statusCode === 410 || err?.statusCode === 404) {
         console.log(`Removing stale push subscription for user ${userId}`);
         try {
           await deleteDoc(doc(db, "push_subscriptions", userId));
@@ -271,17 +297,17 @@ async function startServer() {
     console.log('A user connected:', socket.id);
 
     socket.on('join_bond', async (data: { user: JoinBondUser, partnerCode?: string }) => {
-      const { user, partnerCode } = data;
-      connectedUsers.set(socket.id, user);
-      latestMoods.set(user.seedCode, user.mood);
-      
-      const seedCode = user.seedCode;
+      const { user: joinUser, partnerCode } = data;
+      connectedUsers.set(socket.id, joinUser);
+      latestMoods.set(joinUser.seedCode, joinUser.mood);
+
+      const seedCode = joinUser.seedCode;
       socket.join(seedCode);
-      
+
       if (partnerCode) {
         socket.join(partnerCode);
         partnerCodes.set(seedCode, partnerCode);
-        
+
         // Fetch existing chat history from Firestore
         const pairId = getPairId(seedCode, partnerCode);
         try {
@@ -302,9 +328,9 @@ async function startServer() {
       }
 
       // Let others in the rooms know we joined
-      socket.to(seedCode).emit('user_joined', user);
+      socket.to(seedCode).emit('user_joined', joinUser);
       if (partnerCode) {
-        socket.to(partnerCode).emit('user_joined', user);
+        socket.to(partnerCode).emit('user_joined', joinUser);
       }
     });
 
@@ -353,16 +379,16 @@ async function startServer() {
       // Send to partner's room
       socket.to(data.to).emit('new_message', data.message);
       
-      sendPushNotification(data.to, {
+      void sendPushNotification(data.to, {
         title: "New Message",
-        body: data.message.type === 'text' ? (data.message.text || '') : "Sent you a photo",
+        body: data.message.type === 'text' ? (data.message.text ?? '') : "Sent you a photo",
         icon: "/icons/icon-192.png"
       }, 'messages');
     });
 
     socket.on('trigger_leaf', (to: string) => {
       socket.to(to).emit('leaf_fall');
-      sendPushNotification(to, {
+      void sendPushNotification(to, {
         title: "Thinking of you",
         body: "A leaf fell in your sanctuary 🍃",
         icon: "/icons/icon-192.png"
@@ -372,7 +398,7 @@ async function startServer() {
     socket.on('update_mood', (data: { from: string, to: string, mood: string }) => {
       latestMoods.set(data.from, data.mood);
       socket.to(data.to).emit('partner_mood_changed', data.mood);
-      sendPushNotification(data.to, {
+      void sendPushNotification(data.to, {
         title: "Mood Updated",
         body: `Partner is feeling ${data.mood}`,
         icon: "/icons/icon-192.png"
@@ -386,27 +412,6 @@ async function startServer() {
 
     // ─── Pet Events ─────────────────────────────────────────────
 
-    interface PetProposeData {
-      from: string;
-      to: string;
-      pet: Record<string, unknown>;
-      proposerName: string;
-    }
-
-    interface PetAcceptData {
-      from: string;
-      to: string;
-      pet: Record<string, unknown>;
-      status: Record<string, unknown>;
-    }
-
-    interface PetActionData {
-      from: string;
-      to: string;
-      petId: string;
-      action: Record<string, unknown>;
-    }
-
     socket.on('pet_propose', async (data: PetProposeData) => {
       const pairId = getPairId(data.from, data.to);
       try {
@@ -415,7 +420,7 @@ async function startServer() {
         console.error('Error saving pet proposal', e);
       }
       socket.to(data.to).emit('pet_proposed', { pet: data.pet, proposerName: data.proposerName });
-      sendPushNotification(data.to, {
+      void sendPushNotification(data.to, {
         title: "🐾 Pet Proposal!",
         body: `${data.proposerName} wants to adopt a pet together!`,
         icon: "/icons/icon-192.png"
@@ -487,9 +492,10 @@ async function startServer() {
           io.to(data.from).to(data.to).emit('pet_action_done', { action: data.action, newStatus });
 
           // Notify partner about pet action
-          const actionLabel = actionType === 'feed' ? 'fed' : actionType === 'love' ? 'loved' : 'played with';
-          const actorName = (data.action as { userName?: string }).userName || 'Partner';
-          sendPushNotification(data.to, {
+          const actionLabelMap: Record<string, string> = { feed: 'fed', love: 'loved', play: 'played with' };
+          const actionLabel = actionType ? (actionLabelMap[actionType] ?? actionType) : 'interacted with';
+          const actorName = (data.action as { userName?: string }).userName ?? 'Partner';
+          void sendPushNotification(data.to, {
             title: "🐾 Pet Update",
             body: `${actorName} ${actionLabel} your pet!`,
             icon: "/icons/icon-192.png"
@@ -502,10 +508,10 @@ async function startServer() {
 
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
-      const user = connectedUsers.get(socket.id);
-      if (user) {
-        socket.to(user.seedCode).emit('user_left', user.id);
-        partnerCodes.delete(user.seedCode);
+      const disconnectedUser = connectedUsers.get(socket.id);
+      if (disconnectedUser) {
+        socket.to(disconnectedUser.seedCode).emit('user_left', disconnectedUser.id);
+        partnerCodes.delete(disconnectedUser.seedCode);
         connectedUsers.delete(socket.id);
       }
     });
