@@ -74,20 +74,20 @@ describe('BondScreen', () => {
 
   it('should render the Connect Sanctuary button', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    expect(screen.getByText('Connect Sanctuary')).toBeDefined();
+    expect(screen.getByText('Connect Manually')).toBeDefined();
   });
 
   it('should disable Connect Sanctuary button when partner code input is empty', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const button = screen.getByText('Connect Sanctuary').closest('button') as HTMLButtonElement;
+    const button = screen.getByText('Connect Manually').closest('button') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
 
   it('should enable Connect Sanctuary button when partner code is entered', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    const button = screen.getByText('Connect Sanctuary').closest('button') as HTMLButtonElement;
+    const button = screen.getByText('Connect Manually').closest('button') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
   });
 
@@ -106,9 +106,9 @@ describe('BondScreen', () => {
 
   it('should emit bond_request with correct data when Connect Sanctuary is clicked', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     expect(mockSocket.emit).toHaveBeenCalledWith('bond_request', {
       targetCode: 'Calm-Meadow-408',
@@ -118,9 +118,9 @@ describe('BondScreen', () => {
 
   it('should trim whitespace from partner code before emitting', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: '  Calm-Meadow-408  ' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     expect(mockSocket.emit).toHaveBeenCalledWith('bond_request', expect.objectContaining({
       targetCode: 'Calm-Meadow-408',
@@ -129,7 +129,7 @@ describe('BondScreen', () => {
 
   it('should submit bond request when Enter key is pressed in the input', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(mockSocket.emit).toHaveBeenCalledWith('bond_request', expect.objectContaining({
@@ -141,9 +141,9 @@ describe('BondScreen', () => {
 
   it('should show "Bond request sent" status after server confirms', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     act(() => {
       simulateServerEvent('bond_request_sent', { targetCode: 'Calm-Meadow-408' });
@@ -156,9 +156,9 @@ describe('BondScreen', () => {
 
   it('should show "Partner is not online" message when partner is offline', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     act(() => {
       simulateServerEvent('bond_partner_offline', { targetCode: 'Calm-Meadow-408' });
@@ -171,9 +171,9 @@ describe('BondScreen', () => {
 
   it('should show error message after 8 second timeout with no server response', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     act(() => {
       vi.advanceTimersByTime(8000);
@@ -246,9 +246,9 @@ describe('BondScreen', () => {
 
   it('should reset error status when partner code input changes', () => {
     render(<BondScreen user={mockUser} onUpdateUser={vi.fn()} />);
-    const input = screen.getByPlaceholderText('e.g. Green-Willow-123');
+    const input = screen.getByPlaceholderText("Enter partner's code");
     fireEvent.change(input, { target: { value: 'Calm-Meadow-408' } });
-    fireEvent.click(screen.getByText('Connect Sanctuary').closest('button')!);
+    fireEvent.click(screen.getByText('Connect Manually').closest('button')!);
 
     act(() => { vi.advanceTimersByTime(8000); });
     expect(screen.getByText(/Connection error/i)).toBeDefined();

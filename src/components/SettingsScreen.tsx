@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { User, Mood, CustomMood } from '../types';
 import type { NotificationPreferences, PermissionState } from '../hooks/useNotifications';
 import { AlertTriangle, User as UserIcon, Calendar, Bell, BellOff, Volume2, Moon, Clock, CheckCircle, XCircle, CircleDot, Pencil, Plus } from 'lucide-react';
+import IOSColorPicker from './IOSColorPicker';
 import { socket } from '../socket';
 import { DEFAULT_MOODS } from '../constants';
 import { NOTIFICATION_SOUNDS, playNotificationSound, isAudioSupported } from '../notificationSounds';
@@ -88,6 +89,7 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
   const [playingSoundId, setPlayingSoundId] = useState<string | null>(null);
   const [editingMood, setEditingMood] = useState<CustomMood | null>(null);
   const [isAddingMood, setIsAddingMood] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const { preferences, updatePreferences, permission, toggleMasterSwitch } = notificationProps;
   const isNotifEnabled = permission === 'granted';
@@ -527,13 +529,13 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
                   Color
                 </label>
                 <div className="flex items-center gap-4">
-                  <input
-                    type="color"
-                    value={editingMood.color.startsWith('#') ? editingMood.color : '#A0B0A3'}
-                    onChange={(e) => setEditingMood({ ...editingMood, color: e.target.value })}
-                    className="w-12 h-12 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                  <button
+                    onClick={() => setShowColorPicker(true)}
+                    className="w-12 h-12 rounded-xl shadow-sm border border-sage-200"
+                    style={{ backgroundColor: editingMood.color.startsWith('#') ? editingMood.color : '#A0B0A3' }}
+                    aria-label="Pick color"
                   />
-                  <span className="text-sage-700 font-medium">{editingMood.color}</span>
+                  <span className="text-sage-700 font-medium uppercase">{editingMood.color.startsWith('#') ? editingMood.color : '#A0B0A3'}</span>
                 </div>
               </div>
             </div>
@@ -554,6 +556,15 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
               </button>
             </div>
           </div>
+          
+          {/* iOS Color Picker Portal/Modal */}
+          {showColorPicker && (
+            <IOSColorPicker
+              color={editingMood.color.startsWith('#') ? editingMood.color : '#A0B0A3'}
+              onChange={(c) => setEditingMood({ ...editingMood, color: c })}
+              onClose={() => setShowColorPicker(false)}
+            />
+          )}
         </div>
       )}
     </div>

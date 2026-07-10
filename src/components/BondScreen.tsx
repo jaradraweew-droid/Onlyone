@@ -238,6 +238,7 @@ export default function BondScreen({ user, onUpdateUser }: Props) {
                 </div>
                 <button
                   onClick={handleCopy}
+                  aria-label="Copy seed code"
                   className="p-3 text-sage-500 hover:bg-sage-100 rounded-full transition-colors bg-sage-50 active:scale-95"
                 >
                   {copied ? <Check size={18} /> : <Copy size={18} />}
