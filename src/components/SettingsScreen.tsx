@@ -399,7 +399,7 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
                   </button>
                   <button
                     onClick={() => { setEditingMood(m); setIsAddingMood(false); }}
-                    className="absolute -top-1 -right-1 bg-white rounded-full p-1.5 shadow-md border border-sage-100 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sage-50 z-10"
+                    className="absolute -top-1 -right-1 bg-white rounded-full p-1.5 shadow-md border border-sage-100 transition-colors hover:bg-sage-50 z-10"
                     aria-label={`Edit ${m.label}`}
                   >
                     <Pencil size={12} className="text-sage-500" />
@@ -548,7 +548,7 @@ export default function SettingsScreen({ user, onUpdateUser, notificationProps }
               <button
                 onClick={() => handleSaveMood(editingMood)}
                 disabled={!editingMood.label.trim()}
-                className="flex-1 bg-sage-800 text-white rounded-2xl py-3.5 font-semibold hover:bg-sage-900 transition-colors disabled:opacity-50"
+                className="flex-1 bg-sage-900 text-white rounded-2xl py-3.5 font-semibold hover:bg-sage-700 transition-colors disabled:opacity-50"
               >
                 Save
               </button>
